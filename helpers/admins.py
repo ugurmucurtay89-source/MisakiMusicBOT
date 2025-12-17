@@ -1,39 +1,40 @@
-# Calls Music 1 - Telegram bot for streaming audio in group calls
-# Copyright (C) 2021  Roj Serbest
-
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
+# Calls Music 1 - Telegram grup sesli sohbetlerde müzik akışı botu
+# Telif Hakkı (C) 2021 Roj Serbest
+# GNU Affero Genel Kamu Lisansı v3 altında özgür yazılımdır
 
 from typing import List
-
 from pyrogram.types import Chat, User
 
-import cache.admins
+import cache.admins  # Yönetici önbelleği modülü
 
 
-async def get_administrators(chat: Chat) -> List[User]:
-    get = cache.admins.get(chat.id)
+async def yönetici_listesi_al(chat: Chat) -> List[User]:
+    """
+    Grup yöneticilerini alır ve önbelleğe kaydeder.
+    
+    Args:
+        chat (Chat): Grup sohbeti
+        
+    Returns:
+        List[User]: Yönetici kullanıcı listesi
+    """
+    # Önbellekten kontrol et
+    mevcut = cache.admins.get(chat.id)
 
-    if get:
-        return get
+    if mevcut:
+        return mevcut
     else:
-        administrators = await chat.get_members(filter="administrators")
-        to_set = []
+        # Grubun tüm yöneticilerini al
+        yöneticiler = await chat.get_members(filter="administrators")
+        kaydedilecekler = []
 
-        for administrator in administrators:
-            #if administrator.can_manage_voice_chats:
-            to_set.append(administrator.user.id)
+        # Sesli sohbet yönetme yetkisi olanları ekle
+        for yönetici in yöneticiler:
+            #if yönetici.can_manage_voice_chats:  # Bu satır yorumda kalmış
+            kaydedilecekler.append(yönetici.user.id)
 
+        # Önbelleğe kaydet
+        cache.admins.set(chat.id, kaydedilecekler)
+        return await yönetici_listesi_al(chat)
         cache.admins.set(chat.id, to_set)
         return await get_administrators(chat)
