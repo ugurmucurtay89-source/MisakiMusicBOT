@@ -1,35 +1,41 @@
-# Calls Music 1 - Telegram bot for streaming audio in group calls
-# Copyright (C) 2021  Roj Serbest
-
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-# Modified by Inukaasith 
+# Calls Music 1 - Telegram Grup Sesli Sohbet Müzik Botu
+# Telif Hakkı (C) 2025 Cumhurbaşkanı uraz
+# Inukaasith tarafından düzenlendi
 
 from os import getenv
-
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Global değişkenler (sıra bekleyen şarkılar)
 que = {}
-SESSION_NAME = getenv("SESSION_NAME", "session")
-BOT_TOKEN = getenv("BOT_TOKEN")
-BOT_NAME = getenv("BOT_NAME")
+
+# Oturum adı (kullanıcı hesabı için) - VERDİĞİN DEĞER
+SESSION_NAME = "@Cumhurbbaskani"
+
+# Bot bilgileri (zorunlu) - VERDİĞİN TOKEN
+BOT_TOKEN = "8567616568:AAEaJh29GcTwv_Gq4U6AAAiUcp7VdnXdx-I"
+BOT_NAME = "Uraz Müzik Botu"
+
+# Yönetici listesi
 admins = {}
-API_ID = int(getenv("API_ID"))
-API_HASH = getenv("API_HASH")
 
-DURATION_LIMIT = int(getenv("DURATION_LIMIT", "7"))
+# Telegram API bilgileri (zorunlu) - VERDİĞİN DEĞERLER
+API_ID = 33818253
+API_HASH = "22a4a51c2bd3799fdde7226fc112e6d6"
 
-COMMAND_PREFIXES = list(getenv("COMMAND_PREFIXES", "/ !").split())
+# Maksimum şarkı süresi (dakika) - 10 DAKİKA YAPILDI
+DURATION_LIMIT = 10
 
-SUDO_USERS = list(map(int, getenv("SUDO_USERS").split()))
+# Komut ön ekleri
+COMMAND_PREFIXES = ["/", "!"]
+
+# Süper kullanıcılar (bot adminleri) - SENİN TELEGRAM ID'N
+SUDO_USERS = [916150666]
+
+print("🎵 Calls Music Bot yapılandırması yüklendi!")
+print(f"📱 Bot: {BOT_NAME}")
+print(f"👤 Session: {SESSION_NAME}")
+print(f"⏱️ Maksimum süre: {DURATION_LIMIT} dakika")
+print(f"👑 Admin: {SUDO_USERS}")
+print("✅ HAZIR - Ana bot dosyasını çalıştırın!")
