@@ -1,40 +1,124 @@
-# ZauteMusic (Telegram bot project )
-# Copyright (C) 2021  ZauteKm 
-
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-
+# ZauteMusic - Telegram grup sesli sohbet müzik botu
+# Telif Hakkı (C) 2021 ZauteKm
+# GNU Affero Genel Kamu Lisansı v3
 
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-from config import BOT_NAME as bn
-
-
+from config import BOT_NAME as bn, BOT_OWNER
 
 
 @Client.on_message(
     filters.command("start")
     & filters.private
-    & ~ filters.edited
+    & ~filters.edited
 )
-async def start_(client: Client, message: Message):
+async def baslat_ozel(client: Client, message: Message):
+    """
+    Özel mesajda /start komutu - Bot tanıtımı ve butonlar
+    """
     await message.reply_text(
-        f"""<b><b>Hoş geldiniz {message.from_user.first_name}!</b>
+        f"""👋 <b>Hoş geldiniz {message.from_user.first_name}!</b>
 
-<b>🎙️ MisakiMusic</b> yeni yöntemlerle</b> olabildiğince basit, gruplarınızda müzik <b>Oynatmak,</b> için tasarlanmış bir <b>as projedir</b> sesli sohbetler.
+🎵 <b>{BOT_NAME}</b> grup sesli sohbetlerinizde müzik çalmak için tasarlanmış basit bir bot!
 
+❓ <b>Nasıl kullanılır?</b>
+Komut listesi için <b>/help</b> yazın veya butonlara basın!""",
+        reply_markup=InlineKeyboardMarkup(
+            [ 
+                [
+                    InlineKeyboardButton("➕ Beni Grubunuza Ekleyin ➕", url=f"t.me/{bn}?startgroup=true")
+                ],
+                [
+                    InlineKeyboardButton("📋 Komutlar", callback_data="help"),
+                    InlineKeyboardButton("👑 Sahip", url="https://t.me/Cumhurbbaskani")
+                ],
+                [
+                    InlineKeyboardButton("📢 Müzik Destek", url="https://t.me/muzikkdestekk"),
+                    InlineKeyboardButton("🌐 Netinternet", url="https://t.me/Netinternet20")
+                ],
+                [
+                    InlineKeyboardButton("📶 Sınırsız İnternet", url="https://t.me/sinirsizinternet63"),
+                    InlineKeyboardButton("⭐ BlackSky Sohbet", url="https://t.me/BlackSkySohbett")
+                ],
+                [ 
+                    InlineKeyboardButton("👑 @Cumhurbbaskani 👑", url="https://t.me/Cumhurbbaskani")
+                ]
+            ]
+        ),
+        disable_web_page_preview=True
+    )
+
+
+@Client.on_message(
+    filters.command("start")
+    & filters.group
+    & ~filters.edited
+)
+async def baslat_grup(client: Client, message: Message):
+    """
+    Grup mesajında /start - Hızlı müzik arama önerisi
+    """
+    await message.reply_text(
+        "🎵 <b>YouTube'dan şarkı mı aramak istiyorsunuz?</b>",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("👑 @Cumhurbbaskani", url="https://t.me/Cumhurbbaskani")
+                ],    
+                [    
+                    InlineKeyboardButton("✅ Evet", switch_inline_query_current_chat=""),
+                    InlineKeyboardButton("❌ Hayır", callback_data="close")
+                ],
+                [
+                    InlineKeyboardButton("📢 Müzik Destek", url="https://t.me/muzikkdestekk")
+                ]
+            ]
+        )
+    )
+
+
+@Client.on_message(
+    filters.command("help")
+    & filters.private
+    & ~filters.edited
+)
+async def yardim(client: Client, message: Message):
+    """
+    /help komutu - Tüm komut listesi
+    """
+    await message.reply_text(
+        f"""📋 <b>TÜM KOMUTLAR</b>
+
+🎶 <b>Müzik Komutları:</b>
+• <code>/play şarkı adı</code> - Şarkı çal
+• <code>/playlist</code> - Çalma listesi göster
+• <code>/current</code> - Şu an çalan şarkı
+
+⏯️ <b>Yönetici Komutları:</b>
+• <code>/player</code> - Müzik paneli
+• <code>/pause</code> - Duraklat
+• <code>/resume</code> - Devam et
+• <code>/skip</code> - İleri al
+• <code>/end</code> - Müziği durdur
+
+💾 <b>İndirme Komutları:</b>
+• <code>/song şarkı</code> - Şarkı indir
+• <code>/video şarkı</code> - Video indir
+
+👑 <b>Bot Sahibi:</b> {BOT_OWNER}""",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("👑 @Cumhurbbaskani", url="https://t.me/Cumhurbbaskani")
+                ],
+                [
+                    InlineKeyboardButton("📢 Müzik Destek", url="https://t.me/muzikkdestekk"),
+                    InlineKeyboardButton("🌐 Netinternet", url="https://t.me/Netinternet20")
+                ]
+            ]
+        )
+    )
 <b>❓ Nasıl kullanılır?</b>
 botun komutlarının tam listesini görmek için! » 🎛 <b>Komutlar</b> düğmesine ve Hits /help düğmesine basın <b>GoodVibesMusic!</b>""",
         reply_markup=InlineKeyboardMarkup(
