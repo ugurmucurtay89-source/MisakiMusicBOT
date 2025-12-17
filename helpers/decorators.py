@@ -1,40 +1,64 @@
-# Calls Music 1 - Telegram bot for streaming audio in group calls
-# Copyright (C) 2021  Roj Serbest
+# Calls Music 1 - Telegram grup sesli sohbet müzik botu
+# Telif Hakkı (C) 2021 Roj Serbest
+# GNU Affero Genel Kamu Lisansı v3
 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-
-from typing import Callable
-
+from typing import Callable, List
 from pyrogram import Client
-from pyrogram.types import Message
+from pyrogram.types import Message, Chat, User
 
-from helpers.admins import get_administrators
 from config import SUDO_USERS
+import cache.admins  # Önbellek sistemi (aşağıda tanımlı)
 
 
-def errors(func: Callable) -> Callable:
-    async def decorator(client: Client, message: Message):
+async def yönetici_listesi_al(chat: Chat) -> List[User]:
+    """
+    Grup yöneticilerini alır ve önbelleğe kaydeder.
+    """
+    mevcut = cache.admins.get(chat.id)
+
+    if mevcut:
+        return mevcut
+    else:
+        yöneticiler = await chat.get_members(filter="administrators")
+        kaydedilecekler = []
+
+        for yönetici in yöneticiler:
+            kaydedilecekler.append(yönetici.user.id)
+
+        cache.admins.set(chat.id, kaydedilecekler)
+        return await yönetici_listesi_al(chat)
+
+
+def hata_yakala(func: Callable) -> Callable:
+    """
+    Hata yakalama - Komutlar hata verirse kullanıcıya bildirir
+    """
+    async def dekorator(client: Client, mesaj: Message):
         try:
-            return await func(client, message)
+            return await func(client, mesaj)
         except Exception as e:
-            await message.reply(f"{type(e).__name__}: {e}")
+            await mesaj.reply(f"❌ Hata: {type(e).__name__}: {e}")
 
-    return decorator
+    return dekorator
 
 
-def authorized_users_only(func: Callable) -> Callable:
+def sadece_yetkili_kullanıcılar(func: Callable) -> Callable:
+    """
+    Yetki kontrolü - Sadece adminler ve sudo kullanıcılar kullanabilir
+    """
+    async def dekorator(client: Client, mesaj: Message):
+        # Sen (SUDO_USERS) her zaman kullanabilirsin
+        if mesaj.from_user.id in SUDO_USERS:
+            return await func(client, mesaj)
+
+        # Grup yöneticilerini kontrol et
+        yöneticiler = await yönetici_listesi_al(mesaj.chat)
+
+        for yönetici in yöneticiler:
+            if yönetici == mesaj.from_user.id:
+                return await func(client, mesaj)
+
+    return dekoratordef authorized_users_only(func: Callable) -> Callable:
     async def decorator(client: Client, message: Message):
         if message.from_user.id in SUDO_USERS:
             return await func(client, message)
