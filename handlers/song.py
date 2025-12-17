@@ -1,19 +1,6 @@
-# ZauteMusic (Telegram bot project )
-# Copyright (C) 2021  ZauteKm 
-
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
+# ZauteMusic - Telegram müzik indirme botu
+# Telif Hakkı (C) 2021 ZauteKm
+# GNU Affero Genel Kamu Lisansı v3
 
 from __future__ import unicode_literals
 import os
@@ -27,14 +14,365 @@ from youtube_search import YoutubeSearch
 from Python_ARQ import ARQ
 from urllib.parse import urlparse
 import aiofiles
-import os
-from random import randint
+import random
 from youtubesearchpython import SearchVideos
 from pyrogram.errors import FloodWait, MessageNotModified
 from pyrogram.types import Chat, Message, User
 import asyncio
 from typing import Callable, Coroutine, Dict, List, Tuple, Union
 import sys
+import time
+from helpers.errors import DurationLimitError
+from config import BOT_OWNER, DURATION_LIMIT
+
+@Client.on_message(filters.command('song') & ~filters.channel)
+async def sarkı_indir(client: Client, message: Message):
+    """
+    /song komutu - YouTube'dan şarkı indirir
+    """
+    kullanıcı_id = message.from_user.id 
+    kullanıcı_adı = message.from_user.first_name 
+    rpk = f"[{kullanıcı_adı}](tg://user?id={kullanıcı_id})"
+
+    sorgu = ' '.join(message.command[1:])
+    print(f"🔎 Şarkı aranıyor: {sorgu}")
+    
+    m = await message.reply('🔎 Şarkı bulunuyor...')
+    ydl_opts = {"format": "bestaudio[ext=m4a]"}
+    
+    try:
+        sonuçlar = YoutubeSearch(sorgu, max_results=1).to_dict()
+        link = f"https://youtube.com{sonuçlar[0]['url_suffix']}"
+        başlık = sonuçlar[0]["title"][:40]       
+        kapak = sonuçlar[0]["thumbnails"][0]
+        kapak_adı = f'kapak{başlık}.jpg'
+        kapak_resim = requests.get(kapak, allow_redirects=True)
+        with open(kapak_adı, 'wb') as f:
+            f.write(kapak_resim.content)
+
+        süre = sonuçlar[0]["duration"]
+        izlenme = sonuçlar[0]["views"]
+
+    except Exception as e:
+        await m.edit("❌ Hiçbir şey bulunamadı.
+Başka bir anahtar kelime deneyin!")
+        print(f"Hata: {e}")
+        return
+    
+    await m.edit("📥 Şarkı indiriliyor...")
+    try:
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(link, download=False)
+            ses_dosyası = ydl.prepare_filename(info_dict)
+            ydl.process_info(info_dict)
+        
+        rep = f'**🎵 İndiren: {BOT_OWNER}**'
+        await message.reply_audio(
+            ses_dosyası, 
+            caption=rep, 
+            thumb=kapak_adı, 
+            parse_mode='md', 
+            title=başlık, 
+            duration=time_to_seconds(süre)
+        )
+        await m.delete()
+        
+    except Exception as e:
+        await m.edit('❌ İndirme hatası!')
+        print(e)
+
+    # Dosyaları temizle
+    try:
+        os.remove(ses_dosyası)
+        os.remove(kapak_adı)
+    except:
+        pass
+
+# ARQ API (Müzik servisleri için)
+ARQ_API = "http://35.240.133.234:8000"
+arq = ARQ(ARQ_API)
+
+def metin_al(mesaj: Message) -> str:
+    """Mesajdan sorgu metni alır"""
+    if not mesaj.text:
+        return None
+    if " " in mesaj.text:
+        try:
+            return mesaj.text.split(None, 1)[1]
+        except IndexError:
+            return None
+    return None
+
+def boyut_insan_okur(boyut):
+    """Baytları KB/MB/GB yapar"""
+    if not boyut: return ""
+    güç = 2 ** 10
+    kat = 0
+    birimler = {0: "", 1: "Ki", 2: "Mi", 3: "Gi", 4: "Ti"}
+    while boyut > güç:
+        boyut /= güç
+        kat += 1
+    return f"{round(boyut, 2)} {birimler[kat]}B"
+
+async def ilerleme(current, total, mesaj, baslangic, tur, dosya_adi=None):
+    """İndirme ilerlemesini gösterir"""
+    şimdi = time.time()
+    fark = şimdi - baslangic
+    if round(fark % 10.00) == 0 or current == total:
+        yüzde = current * 100 / total
+        hız = current / fark
+        gecen_zaman = round(fark) * 1000
+        if gecen_zaman == 0: return
+        
+        bitis_zamani = round((total - current) / hız) * 1000
+        tahmini_toplam = gecen_zaman + bitis_zamani
+        
+        ilerleme_cizgisi = "{0}{1} {2}%".format(
+            "🔴" * math.floor(yüzde / 10),
+            "🔘" * (10 - math.floor(yüzde / 10)),
+            round(yüzde, 2)
+        )
+        tmp = f"{ilerleme_cizgisi}
+{boyut_insan_okur(current)} / {boyut_insan_okur(total)}
+Kalan: {zaman_formatla(tahmini_toplam)}"
+        
+        if dosya_adi:
+            try:
+                await mesaj.edit(f"{tur}
+**Dosya:** `{dosya_adi}`
+{tmp}")
+            except FloodWait as e:
+                await asyncio.sleep(e.x)
+        else:
+            try:
+                await mesaj.edit(f"{tur}
+{tmp}")
+            except FloodWait as e:
+                await asyncio.sleep(e.x)
+
+def zaman_formatla(milisaniye: int) -> str:
+    """Milisaniyeyi okunur zamana çevirir"""
+    saniye, milisaniye = divmod(int(milisaniye), 1000)
+    dakika, saniye = divmod(saniye, 60)
+    saat, dakika = divmod(dakika, 60)
+    gün, saat = divmod(saat, 24)
+    tmp = (
+        (f"{gün} gün, " if gün else "") +
+        (f"{saat} saat, " if saat else "") +
+        (f"{dakika} dakika, " if dakika else "") +
+        (f"{saniye} saniye" if saniye else "")
+    )
+    return tmp[:-2]
+
+def saniyeye_cevir(zaman):
+    """HH:MM:SS'yi saniyeye çevirir"""
+    return sum(int(x) * 60 ** i for i, x in enumerate(reversed(str(zaman).split(':'))))
+
+# YouTube indirme ayarları
+ydl_opts = {
+    'format': 'bestaudio/best',
+    'writethumbnail': True,
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192'
+    }]
+}
+
+async def sarkı_indir_url(url):
+    """URL'den şarkı indirir"""
+    dosya_adi = f"{random.randint(6969, 6999)}.mp3"
+    async with aiohttp.ClientSession() as oturum:
+        async with oturum.get(url) as yanıt:
+            if yanıt.status == 200:
+                async with aiofiles.open(dosya_adi, mode='wb') as f:
+                    await f.write(await yanıt.read())
+    return dosya_adi
+
+indirme_durumu = False
+
+@Client.on_message(filters.command("saavn") & ~filters.edited)
+async def saavn_sarkı(_, message):
+    """JioSaavn'dan şarkı indirir"""
+    global indirme_durumu
+    if len(message.command) < 2:
+        await message.reply_text("/saavn <şarkı adı> yazın!")
+        return
+    if indirme_durumu:
+        await message.reply_text("Başka indirme devam ediyor!")
+        return
+    
+    indirme_durumu = True
+    sorgu = message.text.split(None, 1)[1].replace(" ", "%20")
+    m = await message.reply_text("🔎 Aranıyor...")
+    
+    try:
+        şarkılar = await arq.saavn(sorgu)
+        şarkı_adi = şarkılar[0].song
+        link = şarkılar[0].media_url
+        sanatçı = şarkılar[0].singers
+        
+        await m.edit("📥 İndiriliyor...")
+        dosya = await sarkı_indir_url(link)
+        await m.edit("⬆️ Yükleniyor...")
+        
+        await message.reply_audio(
+            audio=dosya, 
+            title=şarkı_adi,
+            performer=sanatçı
+        )
+        os.remove(dosya)
+        await m.delete()
+        
+    except Exception as e:
+        await m.edit(f"❌ Hata: {str(e)}")
+    finally:
+        indirme_durumu = False
+
+@Client.on_message(filters.command("deezer") & ~filters.edited)
+async def deezer_sarkı(_, message):
+    """Deezer'dan şarkı indirir"""
+    global indirme_durumu
+    if len(message.command) < 2:
+        await message.reply_text("/deezer <şarkı adı> yazın!")
+        return
+    if indirme_durumu:
+        await message.reply_text("Başka indirme devam ediyor!")
+        return
+    
+    indirme_durumu = True
+    sorgu = message.text.split(None, 1)[1].replace(" ", "%20")
+    m = await message.reply_text("🔎 Aranıyor...")
+    
+    try:
+        şarkılar = await arq.deezer(sorgu, 1)
+        başlık = şarkılar[0].title
+        link = şarkılar[0].url
+        sanatçı = şarkılar[0].artist
+        
+        await m.edit("📥 İndiriliyor...")
+        dosya = await sarkı_indir_url(link)
+        await m.edit("⬆️ Yükleniyor...")
+        
+        await message.reply_audio(
+            audio=dosya, 
+            title=başlık,
+            performer=sanatçı
+        )
+        os.remove(dosya)
+        await m.delete()
+        
+    except Exception as e:
+        await m.edit(f"❌ Hata: {str(e)}")
+    finally:
+        indirme_durumu = False
+
+@Client.on_message(filters.command(["vsong", "video"]))
+async def video_indir(client: Client, message: Message):
+    """Video indirir (/vsong veya /video)"""
+    global indirme_durumu
+    if indirme_durumu:
+        await message.reply_text("Başka indirme devam ediyor!")
+        return
+
+    sorgu = metin_al(message)
+    pablo = await client.send_message(
+        message.chat.id,
+        f"`YouTube'dan '{sorgu}' alınıyor...`"
+    )
+    
+    if not sorgu:
+        await pablo.edit("❌ Geçersiz komut!")
+        return
+    
+    arama = SearchVideos(sorgu, offset=1, mode="dict", max_results=1)
+    sonuç = arama.result()["search_result"][0]
+    video_link = sonuç["link"]
+    başlık = sonuç["title"]
+    kanal = sonuç["channel"]
+    video_id = sonuç["id"]
+    kapak_link = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+    
+    await asyncio.sleep(0.6)
+    kapak = wget.download(kapak_link)
+    
+    opts = {
+        "format": "best",
+        "addmetadata": True,
+        "key": "FFmpegMetadata",
+        "prefer_ffmpeg": True,
+        "geo_bypass": True,
+        "nocheckcertificate": True,
+        "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
+        "outtmpl": "%(id)s.mp4",
+        "quiet": True,
+    }
+    
+    try:
+        indirme_durumu = True
+        with youtube_dl.YoutubeDL(opts) as ytdl:
+            info = ytdl.extract_info(video_link, False)
+            süre = round(info["duration"] / 60)
+
+            if süre > DURATION_LIMIT:
+                await pablo.edit(f"❌ {DURATION_LIMIT} dakikadan uzun videolara izin yok!")
+                indirme_durumu = False
+                return
+                
+            ytdl_data = ytdl.extract_info(video_link, download=True)
+    
+    except Exception as e:
+        indirme_durumu = False
+        return
+    
+    dosya_adi = f"{ytdl_data['id']}.mp4"
+    açıklama = f"**Video:** `{başlık}`
+**Sorgu:** `{sorgu}`
+**Kanal:** `{kanal}`
+**Link:** `{video_link}`"
+    
+    baslangic = time.time()
+    await client.send_video(
+        message.chat.id, 
+        video=open(dosya_adi, "rb"), 
+        duration=int(ytdl_data["duration"]), 
+        file_name=ytdl_data["title"], 
+        thumb=kapak, 
+        caption=açıklama, 
+        supports_streaming=True,
+        progress=ilerleme,
+        progress_args=(pablo, baslangic, f'`{sorgu} yükleniyor!`', dosya_adi)
+    )
+    
+    await pablo.delete()
+    indirme_durumu = False
+    
+    # Temizlik
+    for dosya in (kapak, dosya_adi):
+        if os.path.exists(dosya):
+            os.remove(dosya)al:** `{kanal}`
+**Link:** `{video_link}`"
+    
+    baslangic = time.time()
+    await client.send_video(
+        message.chat.id, 
+        video=open(dosya_adi, "rb"), 
+        duration=int(ytdl_data["duration"]), 
+        file_name=ytdl_data["title"], 
+        thumb=kapak, 
+        caption=açıklama, 
+        supports_streaming=True,
+        progress=ilerleme,
+        progress_args=(pablo, baslangic, f'`{sorgu} yükleniyor!`', dosya_adi)
+    )
+    
+    await pablo.delete()
+    indirme_durumu = False
+    
+    # Temizlik
+    for dosya in (kapak, dosya_adi):
+        if os.path.exists(dosya):
+            os.remove(dosya)import sys
 import time
 from helpers.errors import DurationLimitError
 
